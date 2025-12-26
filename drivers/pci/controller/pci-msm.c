@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2014-2023, The Linux Foundation. All rights reserved.*/
+/* Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.*/
+/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. */
 
 #include <dt-bindings/regulator/qcom,rpmh-regulator-levels.h>
 #include <linux/aer.h>
@@ -9410,8 +9411,13 @@ void msm_pcie_allow_l1(struct pci_dev *pci_dev)
 	if (!(val & PCI_EXP_LNKCTL_ASPM_L1))
 		sec_pcie_enable_ep_l1(ep_pci_dev, pcie_dev);
 #endif
-	PCIE_DBG2(pcie_dev, "[%d] PCIe: RC%d: %02x:%02x.%01x: exit\n",
-		current->pid, pcie_dev->rc_idx, pci_dev->bus->number,
+
+	msm_pcie_config_l1_enable_all(pcie_dev);
+
+	msm_pcie_write_mask(pcie_dev->parf + PCIE20_PARF_PM_CTRL, BIT(5), 0);
+
+	PCIE_DBG2(pcie_dev, "PCIe: RC%d: %02x:%02x.%01x: exit\n",
+		pcie_dev->rc_idx, pci_dev->bus->number,
 		PCI_SLOT(pci_dev->devfn), PCI_FUNC(pci_dev->devfn));
 	mutex_unlock(&pcie_dev->aspm_lock);
 }
@@ -9421,6 +9427,7 @@ int msm_pcie_prevent_l1(struct pci_dev *pci_dev)
 {
 	struct pci_dev *root_pci_dev;
 	struct msm_pcie_dev_t *pcie_dev;
+	struct pci_bus *bus;
 	u32 cnt = 0;
 	u32 cnt_max = 1000; /* 100ms timeout */
 	int ret = 0;
@@ -9432,6 +9439,7 @@ int msm_pcie_prevent_l1(struct pci_dev *pci_dev)
 	}
 
 	pcie_dev = PCIE_BUS_PRIV_DATA(root_pci_dev->bus);
+	bus = pcie_dev->dev->bus;
 
 #ifdef CONFIG_SEC_PCIE
 	if (!pcie_dev->l1_supported) {
@@ -9462,9 +9470,6 @@ int msm_pcie_prevent_l1(struct pci_dev *pci_dev)
 		return 0;
 	}
 
-	msm_pcie_write_mask(pcie_dev->dm_core +
-				(root_pci_dev->pcie_cap + PCI_EXP_LNKCTL),
-				PCI_EXP_LNKCTL_ASPM_L1, 0);
 	msm_pcie_write_mask(pcie_dev->parf + PCIE20_PARF_PM_CTRL, 0, BIT(5));
 
 	/* confirm link is in L0/L0s */
@@ -9491,8 +9496,10 @@ int msm_pcie_prevent_l1(struct pci_dev *pci_dev)
 		usleep_range(100, 105);
 	}
 
-	PCIE_DBG2(pcie_dev, "[%d] PCIe: RC%d: %02x:%02x.%01x: exit\n",
-		current->pid, pcie_dev->rc_idx, pci_dev->bus->number,
+	msm_pcie_config_l1_disable_all(pcie_dev, bus);
+
+	PCIE_DBG2(pcie_dev, "PCIe: RC%d: %02x:%02x.%01x: exit\n",
+		pcie_dev->rc_idx, pci_dev->bus->number,
 		PCI_SLOT(pci_dev->devfn), PCI_FUNC(pci_dev->devfn));
 	mutex_unlock(&pcie_dev->aspm_lock);
 
