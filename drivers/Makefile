@@ -15,6 +15,7 @@ obj-$(CONFIG_GENERIC_PHY)	+= phy/
 obj-$(CONFIG_PINCTRL)		+= pinctrl/
 obj-$(CONFIG_GPIOLIB)		+= gpio/
 obj-y				+= pwm/
+obj-y				+= pwm/pwm-gpclk/
 
 obj-y				+= pci/
 
