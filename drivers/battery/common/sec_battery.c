@@ -6467,6 +6467,42 @@ static int sec_usb_get_property(struct power_supply *psy,
 	return 0;
 }
 
+static int sec_usb_set_property(struct power_supply *psy,
+				enum power_supply_property psp,
+				const union power_supply_propval *val)
+{
+	struct sec_battery_info *battery = power_supply_get_drvdata(psy);
+	int usb_status;
+	int mA;
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_INPUT_CURRENT_LIMIT:
+		/*
+		 * DWC3/USB PHY reports the configured gadget draw in uA via
+		 * the usb power-supply. Translate that into Samsung's USB
+		 * configure states so the USB_100MA vote is cleared once the
+		 * host configures the device.
+		 */
+		mA = val->intval / 1000;
+
+		if (mA <= 2)
+			usb_status = USB_CURRENT_SUSPENDED;
+		else if (mA <= 100)
+			usb_status = USB_CURRENT_UNCONFIGURED;
+		else if (mA <= 500)
+			usb_status = USB_CURRENT_HIGH_SPEED;
+		else
+			usb_status = USB_CURRENT_SUPER_SPEED;
+
+		if (usb_status != battery->prev_usb_conf)
+			sec_bat_set_usb_configure(battery, usb_status);
+
+		return 0;
+	default:
+		return -EINVAL;
+	}
+}
+
 static int sec_ac_get_property(struct power_supply *psy,
 				enum power_supply_property psp,
 				union power_supply_propval *val)
@@ -8460,6 +8496,7 @@ static const struct power_supply_desc usb_power_supply_desc = {
 	.properties = sec_power_props,
 	.num_properties = ARRAY_SIZE(sec_power_props),
 	.get_property = sec_usb_get_property,
+	.set_property = sec_usb_set_property,
 };
 
 static const struct power_supply_desc ac_power_supply_desc = {
