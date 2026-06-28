@@ -24,6 +24,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/kobject.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/device.h>
@@ -686,6 +687,14 @@ int muic_sysfs_init(struct muic_platform_data *pdata)
 		pr_err("failed to create sysfs\n");
 		return ret;
 	}
+	/*
+	 * afc_disable is part of this sysfs group, but sec/switch has
+	 * already emitted its initial add uevent before the group is
+	 * created. Emit a change uevent so ueventd can apply the
+	 * afc_disable ownership rule after the attribute exists.
+	 */
+	kobject_uevent(&pdata->switch_device->kobj, KOBJ_CHANGE);
+
 	dev_set_drvdata(pdata->switch_device, pdata);
 
 	return ret;
